@@ -298,25 +298,30 @@ function Library:CreateWindow(cfg)
 	stroke(BG, Theme.Stroke, 0.5)
 	addShadow(BG, 20, 0.5)
 
-	-- Floating Toggle Button (Rounded Square to open/close hub)
+	-- Floating Toggle Button (Rounded Square with Logo)
 	local ToggleBtn = create("TextButton", {
 		Name = "GrossHubToggle",
 		BackgroundColor3 = Theme.Secondary,
 		Position = UDim2.new(0, 30, 0, 200),
-		Size = UDim2.fromOffset(46, 46),
+		Size = UDim2.fromOffset(50, 50),
 		AutoButtonColor = false,
 		Text = "",
 		ZIndex = 99,
 		Parent = ScreenGui,
 	})
-	corner(ToggleBtn, 10)
+	corner(ToggleBtn, 12)
 	stroke(ToggleBtn, Theme.Accent, 0.3, 1.5)
 	addShadow(ToggleBtn, 12, 0.4)
 
-	local toggleIcon = icon("layout", 22, false, Theme.Accent)
-	toggleIcon.AnchorPoint = Vector2.new(0.5, 0.5)
-	toggleIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
-	toggleIcon.Parent = ToggleBtn
+	local toggleLogo = create("ImageLabel", {
+		Name = "Logo",
+		Image = "rbxassetid://120694317945692",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		Size = UDim2.new(0.85, 0, 0.85, 0),
+		Parent = ToggleBtn
+	})
 
 	makeDraggable(ToggleBtn, ToggleBtn)
 
@@ -325,7 +330,7 @@ function Library:CreateWindow(cfg)
 		isOpen = not isOpen
 		BG.Visible = isOpen
 		tween(ToggleBtn, TI, { BackgroundColor3 = isOpen and Theme.Accent or Theme.Secondary })
-		tween(toggleIcon, TI, { TextColor3 = isOpen and Theme.Text or Theme.Accent })
+		tween(toggleLogo, TI, { ImageColor3 = isOpen and Theme.Text or Color3.new(1,1,1) })
 	end
 
 	ToggleBtn.Activated:Connect(toggleHub)
