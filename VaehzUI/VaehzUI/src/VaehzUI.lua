@@ -176,6 +176,104 @@ local function openDiscordInvite(code)
 end
 
 ----------------------------------------------------------------------
+-- Library root
+----------------------------------------------------------------------
+local Library = {}
+Library.__index = Library
+
+local ScreenGui = create("ScreenGui", {
+	Name = "GrossHubUI",
+	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+	ResetOnSpawn = false,
+	IgnoreGuiInset = true,
+	DisplayOrder = 999,
+})
+pcall(function() if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end end)
+ScreenGui.Parent = getGuiParent()
+
+-- Notification stack (bottom-right)
+local NotifHolder = create("Frame", {
+	Name = "Notifications",
+	BackgroundTransparency = 1,
+	AnchorPoint = Vector2.new(1, 1),
+	Position = UDim2.new(1, -16, 1, -16),
+	Size = UDim2.new(0, 260, 1, -32),
+	Parent = ScreenGui,
+}, {
+	create("UIListLayout", {
+		Padding = UDim.new(0, 8),
+		HorizontalAlignment = Enum.HorizontalAlignment.Right,
+		VerticalAlignment = Enum.VerticalAlignment.Bottom,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	}),
+})
+
+function Library:Notify(cfg)
+	cfg = cfg or {}
+	local dur = cfg.Duration or 4
+
+	local card = create("Frame", {
+		BackgroundColor3 = Theme.Secondary,
+		BackgroundTransparency = 1,
+		Size = UDim2.new(0, 260, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		ClipsDescendants = true,
+		Parent = NotifHolder,
+	})
+	corner(card, 8)
+	local st = stroke(card, Theme.Stroke, 1)
+
+	local accent = create("Frame", {
+		BackgroundColor3 = Theme.Accent, BackgroundTransparency = 1,
+		Size = UDim2.new(0, 3, 1, 0), BorderSizePixel = 0, Parent = card,
+	})
+
+	local content = create("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 14, 0, 0), Size = UDim2.new(1, -24, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y, Parent = card,
+	}, {
+		create("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }),
+		create("UIPadding", { PaddingTop = UDim.new(0, 11), PaddingBottom = UDim.new(0, 11) }),
+	})
+
+	local titleLbl = create("TextLabel", {
+		BackgroundTransparency = 1, Text = cfg.Title or "Notification", TextTransparency = 1,
+		FontFace = FONT_TITLE, TextColor3 = Theme.Text, TextSize = 14,
+		TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true,
+		Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+		LayoutOrder = 1, Parent = content,
+	})
+	local bodyLbl
+	if cfg.Content then
+		bodyLbl = create("TextLabel", {
+			BackgroundTransparency = 1, Text = cfg.Content, TextTransparency = 1,
+			FontFace = FONT_MAIN, TextColor3 = Theme.SubText, TextSize = 12,
+			TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true,
+			Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+			LayoutOrder = 2, Parent = content,
+		})
+	end
+
+	card.Position = UDim2.new(0, 26, 0, 0)
+	tween(card, TI_S, { BackgroundTransparency = 0, Position = UDim2.new(0, 0, 0, 0) })
+	tween(st, TI_S, { Transparency = STROKE_T })
+	tween(accent, TI_S, { BackgroundTransparency = 0 })
+	tween(titleLbl, TI_S, { TextTransparency = 0 })
+	if bodyLbl then tween(bodyLbl, TI_S, { TextTransparency = 0 }) end
+
+	task.delay(dur, function()
+		tween(card, TI, { BackgroundTransparency = 1, Position = UDim2.new(0, 26, 0, 0) })
+		tween(st, TI, { Transparency = 1 })
+		tween(accent, TI, { BackgroundTransparency = 1 })
+		tween(titleLbl, TI, { TextTransparency = 1 })
+		if bodyLbl then tween(bodyLbl, TI, { TextTransparency = 1 }) end
+		task.wait(0.2)
+		card:Destroy()
+	end)
+end
+
+----------------------------------------------------------------------
 -- Element Factory (Shared by Tabs and SubTabs)
 ----------------------------------------------------------------------
 local function attachElements(api, page)
