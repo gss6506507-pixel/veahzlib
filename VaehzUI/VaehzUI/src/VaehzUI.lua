@@ -94,7 +94,6 @@ local function icon(name, size, filled, color)
 	})
 end
 
--- Draggable window or button via handle (supports Mouse + Touch for Mobile)
 local function makeDraggable(frame, handle)
 	local dragging, dragInput, startPos, startFramePos
 	handle.InputBegan:Connect(function(inp)
@@ -177,101 +176,478 @@ local function openDiscordInvite(code)
 end
 
 ----------------------------------------------------------------------
--- Library root
+-- Element Factory (Shared by Tabs and SubTabs)
 ----------------------------------------------------------------------
-local Library = {}
-Library.__index = Library
+local function attachElements(api, page)
+	api._order = 0
 
-local ScreenGui = create("ScreenGui", {
-	Name = "GrossHubUI",
-	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-	ResetOnSpawn = false,
-	IgnoreGuiInset = true,
-	DisplayOrder = 999,
-})
-pcall(function() if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end end)
-ScreenGui.Parent = getGuiParent()
-
--- Notification stack (bottom-right)
-local NotifHolder = create("Frame", {
-	Name = "Notifications",
-	BackgroundTransparency = 1,
-	AnchorPoint = Vector2.new(1, 1),
-	Position = UDim2.new(1, -16, 1, -16),
-	Size = UDim2.new(0, 260, 1, -32),
-	Parent = ScreenGui,
-}, {
-	create("UIListLayout", {
-		Padding = UDim.new(0, 8),
-		HorizontalAlignment = Enum.HorizontalAlignment.Right,
-		VerticalAlignment = Enum.VerticalAlignment.Bottom,
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	}),
-})
-
-function Library:Notify(cfg)
-	cfg = cfg or {}
-	local dur = cfg.Duration or 4
-
-	local card = create("Frame", {
-		BackgroundColor3 = Theme.Secondary,
-		BackgroundTransparency = 1,
-		Size = UDim2.new(0, 260, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		ClipsDescendants = true,
-		Parent = NotifHolder,
-	})
-	corner(card, 8)
-	local st = stroke(card, Theme.Stroke, 1)
-
-	local accent = create("Frame", {
-		BackgroundColor3 = Theme.Accent, BackgroundTransparency = 1,
-		Size = UDim2.new(0, 3, 1, 0), BorderSizePixel = 0, Parent = card,
-	})
-
-	local content = create("Frame", {
-		BackgroundTransparency = 1,
-		Position = UDim2.new(0, 14, 0, 0), Size = UDim2.new(1, -24, 0, 0),
-		AutomaticSize = Enum.AutomaticSize.Y, Parent = card,
-	}, {
-		create("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }),
-		create("UIPadding", { PaddingTop = UDim.new(0, 11), PaddingBottom = UDim.new(0, 11) }),
-	})
-
-	local titleLbl = create("TextLabel", {
-		BackgroundTransparency = 1, Text = cfg.Title or "Notification", TextTransparency = 1,
-		FontFace = FONT_TITLE, TextColor3 = Theme.Text, TextSize = 14,
-		TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true,
-		Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
-		LayoutOrder = 1, Parent = content,
-	})
-	local bodyLbl
-	if cfg.Content then
-		bodyLbl = create("TextLabel", {
-			BackgroundTransparency = 1, Text = cfg.Content, TextTransparency = 1,
-			FontFace = FONT_MAIN, TextColor3 = Theme.SubText, TextSize = 12,
-			TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true,
-			Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
-			LayoutOrder = 2, Parent = content,
+	local function newRow(height)
+		api._order += 1
+		local row = create("Frame", {
+			BackgroundColor3 = Theme.Element, Size = UDim2.new(1, 0, 0, height or 34),
+			LayoutOrder = api._order, BorderSizePixel = 0, Parent = page,
 		})
+		corner(row, 6)
+		stroke(row, Theme.Stroke, STROKE_T)
+		return row
 	end
 
-	card.Position = UDim2.new(0, 26, 0, 0)
-	tween(card, TI_S, { BackgroundTransparency = 0, Position = UDim2.new(0, 0, 0, 0) })
-	tween(st, TI_S, { Transparency = STROKE_T })
-	tween(accent, TI_S, { BackgroundTransparency = 0 })
-	tween(titleLbl, TI_S, { TextTransparency = 0 })
-	if bodyLbl then tween(bodyLbl, TI_S, { TextTransparency = 0 }) end
+	function api:CreateLabel(text)
+		api._order += 1
+		local row = create("Frame", {
+			BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = api._order,
+			BorderSizePixel = 0, Parent = page,
+		})
+		local lbl = create("TextLabel", {
+			BackgroundTransparency = 1, Text = text or "Label",
+			FontFace = FONT_MAIN, TextColor3 = Theme.SubText, TextSize = 13,
+			TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true,
+			AutomaticSize = Enum.AutomaticSize.Y, Size = UDim2.new(1, -8, 0, 0),
+			Position = UDim2.new(0, 4, 0, 0), Parent = row,
+		})
+		create("UIPadding", { PaddingTop = UDim.new(0, 3), PaddingBottom = UDim.new(0, 3), Parent = row })
+		return { Set = function(_, t) lbl.Text = t end, Instance = row }
+	end
 
-	task.delay(dur, function()
-		tween(card, TI, { BackgroundTransparency = 1, Position = UDim2.new(0, 26, 0, 0) })
-		tween(st, TI, { Transparency = 1 })
-		tween(accent, TI, { BackgroundTransparency = 1 })
-		tween(titleLbl, TI, { TextTransparency = 1 })
-		if bodyLbl then tween(bodyLbl, TI, { TextTransparency = 1 }) end
-		task.wait(0.2)
-		card:Destroy()
-	end)
+	function api:CreateWarning(text)
+		local row = newRow(0)
+		row.AutomaticSize = Enum.AutomaticSize.Y
+		row.BackgroundColor3 = Color3.fromRGB(40, 34, 20)
+		for _, s in row:GetChildren() do if s:IsA("UIStroke") then s.Color = Theme.Warning; s.Transparency = 0.5 end end
+		create("UIPadding", {
+			PaddingTop = UDim.new(0, 9), PaddingBottom = UDim.new(0, 9),
+			PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), Parent = row,
+		})
+		local ico = icon("triangle-exclamation", 18, false, Theme.Warning)
+		ico.AnchorPoint = Vector2.new(0, 0.5)
+		ico.Position = UDim2.new(0, 0, 0.5, 0)
+		ico.Parent = row
+		local lbl = create("TextLabel", {
+			BackgroundTransparency = 1, Text = text or "Warning",
+			FontFace = FONT_MAIN, TextColor3 = Theme.Warning, TextSize = 14,
+			TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center,
+			TextWrapped = true, AutomaticSize = Enum.AutomaticSize.Y,
+			Size = UDim2.new(1, -28, 0, 0), Position = UDim2.new(0, 28, 0, 0), Parent = row,
+		})
+		return { Set = function(_, t) lbl.Text = t end, Instance = row }
+	end
+
+	function api:CreateButton(bcfg)
+		bcfg = bcfg or {}
+		api._order += 1
+		local btnEl = create("TextButton", {
+			Text = "", AutoButtonColor = false, BackgroundColor3 = Theme.Element,
+			Size = UDim2.new(1, 0, 0, 36), LayoutOrder = api._order, BorderSizePixel = 0, Parent = page,
+		})
+		corner(btnEl, 6); stroke(btnEl, Theme.Stroke, STROKE_T)
+		create("TextLabel", {
+			BackgroundTransparency = 1, Text = bcfg.Name or "Button",
+			FontFace = FONT_MAIN, TextColor3 = Theme.Text, TextSize = 14,
+			Size = UDim2.new(1, 0, 1, 0), Parent = btnEl,
+		})
+		btnEl.MouseEnter:Connect(function() tween(btnEl, TI, { BackgroundColor3 = Theme.ElementHover }) end)
+		btnEl.MouseLeave:Connect(function() tween(btnEl, TI, { BackgroundColor3 = Theme.Element }) end)
+		btnEl.Activated:Connect(function()
+			tween(btnEl, TI, { BackgroundColor3 = Theme.Accent })
+			task.wait(0.12); tween(btnEl, TI, { BackgroundColor3 = Theme.Element })
+			if bcfg.Callback then task.spawn(bcfg.Callback) end
+		end)
+		return { Instance = btnEl }
+	end
+
+	function api:CreateToggle(tocfg)
+		tocfg = tocfg or {}
+		local state = tocfg.Default or false
+		local row = newRow(36)
+		local btnEl = create("TextButton", { Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = row })
+		create("TextLabel", {
+			BackgroundTransparency = 1, Text = tocfg.Name or "Toggle",
+			FontFace = FONT_MAIN, TextColor3 = Theme.Text, TextSize = 14,
+			TextXAlignment = Enum.TextXAlignment.Left, AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 10, 0.5, 0), Size = UDim2.new(1, -70, 1, 0), Parent = btnEl,
+		})
+		local track = create("Frame", {
+			BackgroundColor3 = state and Theme.Accent or Theme.Off,
+			AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0),
+			Size = UDim2.fromOffset(40, 20), BorderSizePixel = 0, Parent = btnEl,
+		})
+		corner(track, 10)
+		local knob = create("Frame", {
+			BackgroundColor3 = Theme.Text, AnchorPoint = Vector2.new(0, 0.5),
+			Position = state and UDim2.new(1, -18, 0.5, 0) or UDim2.new(0, 2, 0.5, 0),
+			Size = UDim2.fromOffset(16, 16), BorderSizePixel = 0, Parent = track,
+		})
+		corner(knob, 8)
+
+		local api_obj = {}
+		function api_obj:Set(v)
+			state = v
+			tween(track, TI, { BackgroundColor3 = state and Theme.Accent or Theme.Off })
+			tween(knob, TI, { Position = state and UDim2.new(1, -18, 0.5, 0) or UDim2.new(0, 2, 0.5, 0) })
+			if tocfg.Callback then task.spawn(tocfg.Callback, state) end
+		end
+		function api_obj:Get() return state end
+		btnEl.Activated:Connect(function() api_obj:Set(not state) end)
+		if state and tocfg.Callback then task.spawn(tocfg.Callback, true) end
+		api_obj.Instance = row
+		return api_obj
+	end
+
+	function api:CreateStat(scfg)
+		scfg = scfg or {}
+		local row = newRow(34)
+		create("TextLabel", {
+			BackgroundTransparency = 1, Text = scfg.Name or "Stat",
+			FontFace = FONT_MAIN, TextColor3 = Theme.SubText, TextSize = 14,
+			TextXAlignment = Enum.TextXAlignment.Left, AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 10, 0.5, 0), Size = UDim2.new(0.5, -10, 1, 0), Parent = row,
+		})
+		local valLbl = create("TextLabel", {
+			BackgroundTransparency = 1, Text = tostring(scfg.Value or "-"),
+			FontFace = FONT_TITLE, TextColor3 = Theme.Accent, TextSize = 14,
+			TextXAlignment = Enum.TextXAlignment.Right, TextTruncate = Enum.TextTruncate.AtEnd,
+			AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0),
+			Size = UDim2.new(0.5, -10, 1, 0), Parent = row,
+		})
+		return { Set = function(_, v) valLbl.Text = tostring(v) end, Instance = row }
+	end
+
+	function api:CreateSlider(slcfg)
+		slcfg = slcfg or {}
+		local min, max = slcfg.Min or 0, slcfg.Max or 100
+		local inc = slcfg.Increment or 1
+		local value = math.clamp(slcfg.Default or min, min, max)
+		local row = newRow(50)
+
+		create("TextLabel", {
+			BackgroundTransparency = 1, Text = slcfg.Name or "Slider",
+			FontFace = FONT_MAIN, TextColor3 = Theme.Text, TextSize = 14,
+			TextXAlignment = Enum.TextXAlignment.Left, Position = UDim2.new(0, 10, 0, 6),
+			Size = UDim2.new(1, -70, 0, 16), Parent = row,
+		})
+		local valLbl = create("TextLabel", {
+			BackgroundTransparency = 1, Text = tostring(value),
+			FontFace = FONT_TITLE, TextColor3 = Theme.Accent, TextSize = 14,
+			TextXAlignment = Enum.TextXAlignment.Right, AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -10, 0, 6), Size = UDim2.new(0, 60, 0, 16), Parent = row,
+		})
+		local track = create("Frame", {
+			BackgroundColor3 = Theme.Off, AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 10, 1, -14), Size = UDim2.new(1, -20, 0, 6),
+			BorderSizePixel = 0, Parent = row,
+		})
+		corner(track, 3)
+		local fill = create("Frame", {
+			BackgroundColor3 = Theme.Accent, Size = UDim2.new((value - min) / (max - min), 0, 1, 0),
+			BorderSizePixel = 0, Parent = track,
+		})
+		corner(fill, 3)
+		local knob = create("Frame", {
+			BackgroundColor3 = Theme.Text, AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new((value - min) / (max - min), 0, 0.5, 0),
+			Size = UDim2.fromOffset(14, 14), BorderSizePixel = 0, ZIndex = 2, Parent = track,
+		})
+		corner(knob, 7)
+
+		local api_obj = {}
+		local function apply(alpha, fire)
+			local raw = min + (max - min) * alpha
+			value = math.clamp(math.floor(raw / inc + 0.5) * inc, min, max)
+			local a = (max - min) == 0 and 0 or (value - min) / (max - min)
+			fill.Size = UDim2.new(a, 0, 1, 0)
+			knob.Position = UDim2.new(a, 0, 0.5, 0)
+			valLbl.Text = tostring(value)
+			if fire and slcfg.Callback then task.spawn(slcfg.Callback, value) end
+		end
+		bindDrag(track, function(ax) apply(ax, true) end)
+		function api_obj:Set(v) apply((math.clamp(v, min, max) - min) / (max - min), true) end
+		function api_obj:Get() return value end
+		api_obj.Instance = row
+		return api_obj
+	end
+
+	function api:CreateTextbox(txcfg)
+		txcfg = txcfg or {}
+		local row = newRow(36)
+		create("TextLabel", {
+			BackgroundTransparency = 1, Text = txcfg.Name or "Textbox",
+			FontFace = FONT_MAIN, TextColor3 = Theme.Text, TextSize = 14,
+			TextXAlignment = Enum.TextXAlignment.Left, AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 10, 0.5, 0), Size = UDim2.new(0.4, -10, 1, 0), Parent = row,
+		})
+		local boxWrap = create("Frame", {
+			BackgroundColor3 = Theme.Secondary, AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.new(0, 0, 0, 24),
+			AutomaticSize = Enum.AutomaticSize.X, ClipsDescendants = true,
+			BorderSizePixel = 0, Parent = row,
+		}, {
+			create("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }),
+		})
+		corner(boxWrap, 5)
+		local tbStroke = stroke(boxWrap, Theme.Stroke, STROKE_T)
+		local tb = create("TextBox", {
+			BackgroundTransparency = 1, Text = txcfg.Default or "",
+			PlaceholderText = txcfg.Placeholder or "...", PlaceholderColor3 = Theme.SubText,
+			FontFace = FONT_MAIN, TextColor3 = Theme.Text, TextSize = 13,
+			ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Left,
+			AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.new(0, 0, 1, 0), Parent = boxWrap,
+		}, {
+			create("UISizeConstraint", {
+				MinSize = Vector2.new(txcfg.MinWidth or 56, 0),
+				MaxSize = Vector2.new(txcfg.MaxWidth or 180, math.huge),
+			}),
+		})
+		tb.Focused:Connect(function() tween(tbStroke, TI, { Color = Theme.Accent, Transparency = 0.2 }) end)
+		tb.FocusLost:Connect(function()
+			tween(tbStroke, TI, { Color = Theme.Stroke, Transparency = STROKE_T })
+			if txcfg.Callback then task.spawn(txcfg.Callback, tb.Text) end
+		end)
+		return {
+			Set = function(_, t) tb.Text = t end,
+			Get = function() return tb.Text end,
+			Instance = row,
+		}
+	end
+
+	function api:CreateColorPicker(ccfg)
+		ccfg = ccfg or {}
+		local color = ccfg.Default or Color3.fromRGB(255, 0, 0)
+		local h, s, v = color:ToHSV()
+
+		local row = newRow(36)
+		row.ClipsDescendants = true
+		local header = create("TextButton", { Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 36), Parent = row })
+		create("TextLabel", {
+			BackgroundTransparency = 1, Text = ccfg.Name or "Color",
+			FontFace = FONT_MAIN, TextColor3 = Theme.Text, TextSize = 14,
+			TextXAlignment = Enum.TextXAlignment.Left, AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 10, 0.5, 0), Size = UDim2.new(1, -60, 1, 0), Parent = header,
+		})
+		local swatch = create("Frame", {
+			BackgroundColor3 = color, AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -10, 0.5, 0), Size = UDim2.fromOffset(34, 18),
+			BorderSizePixel = 0, Parent = header,
+		})
+		corner(swatch, 4); stroke(swatch, Theme.Stroke, 0.4)
+
+		local body = create("Frame", {
+			BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 36),
+			Size = UDim2.new(1, 0, 0, 130), Visible = false, Parent = row,
+		})
+		create("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10), Parent = body })
+
+		local sv = create("Frame", {
+			BackgroundColor3 = Color3.fromHSV(h, 1, 1), Size = UDim2.new(1, -34, 1, 0),
+			BorderSizePixel = 0, Parent = body,
+		})
+		corner(sv, 4)
+		create("Frame", { BackgroundColor3 = Color3.new(1,1,1), Size = UDim2.new(1,0,1,0), BorderSizePixel = 0, Parent = sv }, {
+			create("UIGradient", { Color = ColorSequence.new(Color3.new(1,1,1)), Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,0), NumberSequenceKeypoint.new(1,1) }) }),
+			create("UICorner", { CornerRadius = UDim.new(0,4) }),
+		})
+		create("Frame", { BackgroundColor3 = Color3.new(0,0,0), Size = UDim2.new(1,0,1,0), BorderSizePixel = 0, Parent = sv }, {
+			create("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.new(0,0,0)), Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,1), NumberSequenceKeypoint.new(1,0) }) }),
+			create("UICorner", { CornerRadius = UDim.new(0,4) }),
+		})
+		local svCursor = create("Frame", {
+			BackgroundColor3 = Color3.new(1,1,1), AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(s, 0, 1 - v, 0), Size = UDim2.fromOffset(8, 8),
+			BorderSizePixel = 0, ZIndex = 5, Parent = sv,
+		})
+		corner(svCursor, 4); stroke(svCursor, Color3.new(0,0,0), 0.2)
+
+		local hue = create("Frame", {
+			AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0),
+			Size = UDim2.new(0, 22, 1, 0), BorderSizePixel = 0, Parent = body,
+		}, {
+			create("UIGradient", {
+				Rotation = 90,
+				Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255,0,0)),
+					ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255,255,0)),
+					ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0,255,0)),
+					ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0,255,255)),
+					ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0,0,255)),
+					ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255,0,255)),
+					ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255,0,0)),
+				}),
+			}),
+			create("UICorner", { CornerRadius = UDim.new(0, 4) }),
+		})
+		local hueCursor = create("Frame", {
+			BackgroundColor3 = Color3.new(1,1,1), AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, h, 0), Size = UDim2.new(1, 4, 0, 4),
+			BorderSizePixel = 0, ZIndex = 5, Parent = hue,
+		})
+		corner(hueCursor, 2); stroke(hueCursor, Color3.new(0,0,0), 0.2)
+
+		local function refresh(fire)
+			color = Color3.fromHSV(h, s, v)
+			sv.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+			svCursor.Position = UDim2.new(s, 0, 1 - v, 0)
+			hueCursor.Position = UDim2.new(0.5, 0, h, 0)
+			swatch.BackgroundColor3 = color
+			if fire and ccfg.Callback then task.spawn(ccfg.Callback, color) end
+		end
+		bindDrag(sv, function(ax, ay) s = ax; v = 1 - ay; refresh(true) end)
+		bindDrag(hue, function(_, ay) h = ay; refresh(true) end)
+
+		local open = false
+		header.Activated:Connect(function()
+			open = not open
+			if open then body.Visible = true end
+			tween(row, TI_S, { Size = UDim2.new(1, 0, 0, open and 172 or 36) })
+			if not open then task.delay(0.12, function() if not open then body.Visible = false end end) end
+		end)
+
+		local api_obj = {}
+		function api_obj:Set(c) h, s, v = c:ToHSV(); refresh(true) end
+		function api_obj:Get() return color end
+		api_obj.Instance = row
+		return api_obj
+	end
+
+	function api:CreateDropdown(dcfg)
+		dcfg = dcfg or {}
+		local options = dcfg.Options or {}
+		local multi = dcfg.Multi or false
+		local selected = {}
+		if dcfg.Default then
+			if type(dcfg.Default) == "table" then
+				for _, d in dcfg.Default do selected[d] = true end
+			else selected[dcfg.Default] = true end
+		end
+
+		local row = newRow(36)
+		row.ClipsDescendants = true
+		local header = create("TextButton", { Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 36), Parent = row })
+		create("TextLabel", {
+			BackgroundTransparency = 1, Text = dcfg.Name or "Dropdown",
+			FontFace = FONT_MAIN, TextColor3 = Theme.Text, TextSize = 14,
+			TextXAlignment = Enum.TextXAlignment.Left, AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 10, 0.5, 0), Size = UDim2.new(0.5, 0, 1, 0), Parent = header,
+		})
+		local valLbl = create("TextLabel", {
+			BackgroundTransparency = 1, Text = "",
+			FontFace = FONT_MAIN, TextColor3 = Theme.SubText, TextSize = 13,
+			TextXAlignment = Enum.TextXAlignment.Right, TextTruncate = Enum.TextTruncate.AtEnd,
+			AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -32, 0.5, 0),
+			Size = UDim2.new(0.5, -8, 1, 0), Parent = header,
+		})
+		local chev = icon("chevron-down", 16, false, Theme.SubText)
+		chev.AnchorPoint = Vector2.new(1, 0.5)
+		chev.Position = UDim2.new(1, -10, 0.5, 0)
+		chev.Parent = header
+
+		local list = create("Frame", {
+			BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 36),
+			Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+			Visible = false, Parent = row,
+		}, {
+			create("UIListLayout", { Padding = UDim.new(0, 2), SortOrder = Enum.SortOrder.LayoutOrder }),
+			create("UIPadding", { PaddingLeft = UDim.new(0,8), PaddingRight = UDim.new(0,8), PaddingBottom = UDim.new(0,8) }),
+		})
+
+		local function updateValLabel()
+			local picked = {}
+			for _, o in options do if selected[o] then table.insert(picked, o) end end
+			valLbl.Text = #picked == 0 and "None" or table.concat(picked, ", ")
+		end
+
+		local api_obj = {}
+		local optionBtns = {}
+
+		local function rebuild()
+			for _, b in optionBtns do b.btn:Destroy() end
+			table.clear(optionBtns)
+			for i, opt in options do
+				local ob = create("TextButton", {
+					Text = "", AutoButtonColor = false, BackgroundColor3 = Theme.Secondary,
+					Size = UDim2.new(1, 0, 0, 28), LayoutOrder = i, BorderSizePixel = 0, Parent = list,
+				})
+				corner(ob, 5)
+				local txt = create("TextLabel", {
+					BackgroundTransparency = 1, Text = opt, FontFace = FONT_MAIN,
+					TextColor3 = selected[opt] and Theme.Accent or Theme.SubText, TextSize = 13,
+					TextXAlignment = Enum.TextXAlignment.Left, Position = UDim2.new(0, 8, 0, 0),
+					Size = UDim2.new(1, -30, 1, 0), Parent = ob,
+				})
+				local check = icon("check", 14, false, Theme.Accent)
+				check.AnchorPoint = Vector2.new(1, 0.5)
+				check.Position = UDim2.new(1, -8, 0.5, 0)
+				check.Visible = selected[opt] == true
+				check.Parent = ob
+
+				ob.MouseEnter:Connect(function() tween(ob, TI, { BackgroundColor3 = Theme.ElementHover }) end)
+				ob.MouseLeave:Connect(function() tween(ob, TI, { BackgroundColor3 = Theme.Secondary }) end)
+				ob.Activated:Connect(function()
+					if multi then
+						selected[opt] = not selected[opt]
+					else
+						table.clear(selected); selected[opt] = true
+					end
+					for _, b in optionBtns do
+						local on = selected[b.opt] == true
+						b.check.Visible = on
+						tween(b.txt, TI, { TextColor3 = on and Theme.Accent or Theme.SubText })
+					end
+					updateValLabel()
+					if dcfg.Callback then
+						if multi then
+							local out = {}
+							for _, o in options do if selected[o] then table.insert(out, o) end end
+							task.spawn(dcfg.Callback, out)
+						else
+							task.spawn(dcfg.Callback, opt)
+						end
+					end
+					if not multi then
+						task.wait(0.05)
+						api_obj._toggle(false)
+					end
+				end)
+				table.insert(optionBtns, { btn = ob, opt = opt, txt = txt, check = check })
+			end
+			updateValLabel()
+		end
+
+		local function openHeight()
+			local n = #options
+			if n == 0 then return 44 end
+			return 36 + (n * 28) + ((n - 1) * 2) + 8
+		end
+
+		local open = false
+		function api_obj._toggle(force)
+			if force ~= nil then open = force else open = not open end
+			if open then list.Visible = true end
+			tween(row, TI_S, { Size = UDim2.new(1, 0, 0, open and openHeight() or 36) })
+			tween(chev, TI, { Rotation = open and 180 or 0 })
+			if not open then task.delay(0.12, function() if not open then list.Visible = false end end) end
+		end
+		header.Activated:Connect(function() api_obj._toggle() end)
+
+		function api_obj:Refresh(newOpts)
+			options = newOpts or options
+			rebuild()
+			if open then api_obj._toggle(true) end
+		end
+		function api_obj:Set(val)
+			table.clear(selected)
+			if type(val) == "table" then for _, x in val do selected[x] = true end
+			else selected[val] = true end
+			rebuild()
+		end
+		function api_obj:Get()
+			local out = {}
+			for _, o in options do if selected[o] then table.insert(out, o) end end
+			return multi and out or out[1]
+		end
+		api_obj.Instance = row
+		rebuild()
+		return api_obj
+	end
 end
 
 ----------------------------------------------------------------------
@@ -298,7 +674,7 @@ function Library:CreateWindow(cfg)
 	stroke(BG, Theme.Stroke, 0.5)
 	addShadow(BG, 20, 0.5)
 
-	-- Floating Toggle Button (Rounded Square with Logo)
+	-- Floating Toggle Button
 	local ToggleBtn = create("TextButton", {
 		Name = "GrossHubToggle",
 		BackgroundColor3 = Theme.Secondary,
@@ -450,20 +826,35 @@ function Library:CreateWindow(cfg)
 		local tabName = tcfg.Name or "Tab"
 		local tabIcon = tcfg.Icon or "folder"
 
-		local Tab = { _order = 0 }
+		local Tab = { SubTabs = {}, _currentSub = nil }
 
-		local pageWrap = create("ScrollingFrame", {
+		local pageWrap = create("Frame", {
 			Name = tabName .. "Page", BackgroundTransparency = 1,
-			Size = UDim2.new(1, 0, 1, 0), CanvasSize = UDim2.new(),
-			AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollBarThickness = 3,
-			ScrollBarImageColor3 = Theme.Stroke, ScrollBarImageTransparency = 0.5,
-			Visible = false, Parent = Content,
+			Size = UDim2.new(1, 0, 1, 0), Visible = false, Parent = Content,
+		})
+
+		-- Sub-tab navigation bar (horizontal at top)
+		local subNav = create("ScrollingFrame", {
+			Name = "SubNav", BackgroundColor3 = Theme.Secondary, BackgroundTransparency = 0.5,
+			BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, 32),
+			CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.X,
+			ScrollBarThickness = 0, Visible = false, Parent = pageWrap,
+		}, {
+			create("UIListLayout", { Padding = UDim.new(0, 0), FillDirection = Enum.FillDirection.Horizontal, SortOrder = Enum.SortOrder.LayoutOrder }),
+		})
+		stroke(subNav, Theme.Stroke, STROKE_T, 1)
+
+		-- Main content area (under subNav or full page)
+		local mainScroll = create("ScrollingFrame", {
+			Name = "MainScroll", BackgroundTransparency = 1,
+			Position = UDim2.new(0, 0, 0, 0), Size = UDim2.new(1, 0, 1, 0),
+			CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
+			ScrollBarThickness = 3, ScrollBarImageColor3 = Theme.Stroke,
+			ScrollBarImageTransparency = 0.5, Parent = pageWrap,
 		}, {
 			create("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
 			create("UIPadding", { PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10), PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }),
 		})
-
-		local page = pageWrap
 
 		local btn = create("TextButton", {
 			Name = tabName .. "Btn", Text = "", AutoButtonColor = false,
@@ -498,484 +889,75 @@ function Library:CreateWindow(cfg)
 			tween(nameLbl, TI, { TextColor3 = Theme.Text })
 		end
 
-		btn.MouseEnter:Connect(function()
-			if not pageWrap.Visible then tween(btn, TI, { BackgroundTransparency = 0.6 }) end
-		end)
-		btn.MouseLeave:Connect(function()
-			if not pageWrap.Visible then tween(btn, TI, { BackgroundTransparency = 1 }) end
-		end)
+		btn.MouseEnter:Connect(function() if not pageWrap.Visible then tween(btn, TI, { BackgroundTransparency = 0.6 }) end end)
+		btn.MouseLeave:Connect(function() if not pageWrap.Visible then tween(btn, TI, { BackgroundTransparency = 1 }) end end)
 		btn.Activated:Connect(select)
 
-		Tab._btn, Tab._icon, Tab._name, Tab._page, Tab._wrap, Tab._select = btn, ic, nameLbl, page, pageWrap, select
+		Tab._btn, Tab._icon, Tab._name, Tab._wrap = btn, ic, nameLbl, pageWrap
 		table.insert(Window.Tabs, Tab)
 		if #Window.Tabs == 1 then select() end
 
-		local function newRow(height)
-			Tab._order += 1
-			local row = create("Frame", {
-				BackgroundColor3 = Theme.Element, Size = UDim2.new(1, 0, 0, height or 34),
-				LayoutOrder = Tab._order, BorderSizePixel = 0, Parent = page,
-			})
-			corner(row, 6)
-			stroke(row, Theme.Stroke, STROKE_T)
-			return row
-		end
+		-- Attach standard elements to the main tab page
+		attachElements(Tab, mainScroll)
 
-		function Tab:CreateLabel(text)
-			Tab._order += 1
-			local row = create("Frame", {
-				BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0),
-				AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = Tab._order,
-				BorderSizePixel = 0, Parent = page,
-			})
-			local lbl = create("TextLabel", {
-				BackgroundTransparency = 1, Text = text or "Label",
-				FontFace = FONT_MAIN, TextColor3 = Theme.SubText, TextSize = 13,
-				TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true,
-				AutomaticSize = Enum.AutomaticSize.Y, Size = UDim2.new(1, -8, 0, 0),
-				Position = UDim2.new(0, 4, 0, 0), Parent = row,
-			})
-			create("UIPadding", { PaddingTop = UDim.new(0, 3), PaddingBottom = UDim.new(0, 3), Parent = row })
-			return { Set = function(_, t) lbl.Text = t end, Instance = row }
-		end
+		function Tab:CreateSubTab(stcfg)
+			stcfg = stcfg or {}
+			local subName = stcfg.Name or "SubTab"
+			subNav.Visible = true
+			mainScroll.Position = UDim2.new(0, 0, 0, 32)
+			mainScroll.Size = UDim2.new(1, 0, 1, -32)
 
-		function Tab:CreateWarning(text)
-			local row = newRow(0)
-			row.AutomaticSize = Enum.AutomaticSize.Y
-			row.BackgroundColor3 = Color3.fromRGB(40, 34, 20)
-			for _, s in row:GetChildren() do if s:IsA("UIStroke") then s.Color = Theme.Warning; s.Transparency = 0.5 end end
-			create("UIPadding", {
-				PaddingTop = UDim.new(0, 9), PaddingBottom = UDim.new(0, 9),
-				PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), Parent = row,
-			})
-			local ico = icon("triangle-exclamation", 18, false, Theme.Warning)
-			ico.AnchorPoint = Vector2.new(0, 0.5)
-			ico.Position = UDim2.new(0, 0, 0.5, 0)
-			ico.Parent = row
-			local lbl = create("TextLabel", {
-				BackgroundTransparency = 1, Text = text or "Warning",
-				FontFace = FONT_MAIN, TextColor3 = Theme.Warning, TextSize = 14,
-				TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center,
-				TextWrapped = true, AutomaticSize = Enum.AutomaticSize.Y,
-				Size = UDim2.new(1, -28, 0, 0), Position = UDim2.new(0, 28, 0, 0), Parent = row,
-			})
-			return { Set = function(_, t) lbl.Text = t end, Instance = row }
-		end
-
-		function Tab:CreateButton(bcfg)
-			bcfg = bcfg or {}
-			Tab._order += 1
-			local btnEl = create("TextButton", {
-				Text = "", AutoButtonColor = false, BackgroundColor3 = Theme.Element,
-				Size = UDim2.new(1, 0, 0, 36), LayoutOrder = Tab._order, BorderSizePixel = 0, Parent = page,
-			})
-			corner(btnEl, 6); stroke(btnEl, Theme.Stroke, STROKE_T)
-			create("TextLabel", {
-				BackgroundTransparency = 1, Text = bcfg.Name or "Button",
-				FontFace = FONT_MAIN, TextColor3 = Theme.Text, TextSize = 14,
-				Size = UDim2.new(1, 0, 1, 0), Parent = btnEl,
-			})
-			btnEl.MouseEnter:Connect(function() tween(btnEl, TI, { BackgroundColor3 = Theme.ElementHover }) end)
-			btnEl.MouseLeave:Connect(function() tween(btnEl, TI, { BackgroundColor3 = Theme.Element }) end)
-			btnEl.Activated:Connect(function()
-				tween(btnEl, TI, { BackgroundColor3 = Theme.Accent })
-				task.wait(0.12); tween(btnEl, TI, { BackgroundColor3 = Theme.Element })
-				if bcfg.Callback then task.spawn(bcfg.Callback) end
-			end)
-			return { Instance = btnEl }
-		end
-
-		function Tab:CreateToggle(tocfg)
-			tocfg = tocfg or {}
-			local state = tocfg.Default or false
-			local row = newRow(36)
-			local btnEl = create("TextButton", { Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Parent = row })
-			create("TextLabel", {
-				BackgroundTransparency = 1, Text = tocfg.Name or "Toggle",
-				FontFace = FONT_MAIN, TextColor3 = Theme.Text, TextSize = 14,
-				TextXAlignment = Enum.TextXAlignment.Left, AnchorPoint = Vector2.new(0, 0.5),
-				Position = UDim2.new(0, 10, 0.5, 0), Size = UDim2.new(1, -70, 1, 0), Parent = btnEl,
-			})
-			local track = create("Frame", {
-				BackgroundColor3 = state and Theme.Accent or Theme.Off,
-				AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0),
-				Size = UDim2.fromOffset(40, 20), BorderSizePixel = 0, Parent = btnEl,
-			})
-			corner(track, 10)
-			local knob = create("Frame", {
-				BackgroundColor3 = Theme.Text, AnchorPoint = Vector2.new(0, 0.5),
-				Position = state and UDim2.new(1, -18, 0.5, 0) or UDim2.new(0, 2, 0.5, 0),
-				Size = UDim2.fromOffset(16, 16), BorderSizePixel = 0, Parent = track,
-			})
-			corner(knob, 8)
-
-			local api = {}
-			function api:Set(v)
-				state = v
-				tween(track, TI, { BackgroundColor3 = state and Theme.Accent or Theme.Off })
-				tween(knob, TI, { Position = state and UDim2.new(1, -18, 0.5, 0) or UDim2.new(0, 2, 0.5, 0) })
-				if tocfg.Callback then task.spawn(tocfg.Callback, state) end
-			end
-			function api:Get() return state end
-			btnEl.Activated:Connect(function() api:Set(not state) end)
-			if state and tocfg.Callback then task.spawn(tocfg.Callback, true) end
-			api.Instance = row
-			return api
-		end
-
-		function Tab:CreateStat(scfg)
-			scfg = scfg or {}
-			local row = newRow(34)
-			create("TextLabel", {
-				BackgroundTransparency = 1, Text = scfg.Name or "Stat",
-				FontFace = FONT_MAIN, TextColor3 = Theme.SubText, TextSize = 14,
-				TextXAlignment = Enum.TextXAlignment.Left, AnchorPoint = Vector2.new(0, 0.5),
-				Position = UDim2.new(0, 10, 0.5, 0), Size = UDim2.new(0.5, -10, 1, 0), Parent = row,
-			})
-			local valLbl = create("TextLabel", {
-				BackgroundTransparency = 1, Text = tostring(scfg.Value or "-"),
-				FontFace = FONT_TITLE, TextColor3 = Theme.Accent, TextSize = 14,
-				TextXAlignment = Enum.TextXAlignment.Right, TextTruncate = Enum.TextTruncate.AtEnd,
-				AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0),
-				Size = UDim2.new(0.5, -10, 1, 0), Parent = row,
-			})
-			return { Set = function(_, v) valLbl.Text = tostring(v) end, Instance = row }
-		end
-
-		function Tab:CreateSlider(slcfg)
-			slcfg = slcfg or {}
-			local min, max = slcfg.Min or 0, slcfg.Max or 100
-			local inc = slcfg.Increment or 1
-			local value = math.clamp(slcfg.Default or min, min, max)
-			local row = newRow(50)
-
-			create("TextLabel", {
-				BackgroundTransparency = 1, Text = slcfg.Name or "Slider",
-				FontFace = FONT_MAIN, TextColor3 = Theme.Text, TextSize = 14,
-				TextXAlignment = Enum.TextXAlignment.Left, Position = UDim2.new(0, 10, 0, 6),
-				Size = UDim2.new(1, -70, 0, 16), Parent = row,
-			})
-			local valLbl = create("TextLabel", {
-				BackgroundTransparency = 1, Text = tostring(value),
-				FontFace = FONT_TITLE, TextColor3 = Theme.Accent, TextSize = 14,
-				TextXAlignment = Enum.TextXAlignment.Right, AnchorPoint = Vector2.new(1, 0),
-				Position = UDim2.new(1, -10, 0, 6), Size = UDim2.new(0, 60, 0, 16), Parent = row,
-			})
-			local track = create("Frame", {
-				BackgroundColor3 = Theme.Off, AnchorPoint = Vector2.new(0, 0.5),
-				Position = UDim2.new(0, 10, 1, -14), Size = UDim2.new(1, -20, 0, 6),
-				BorderSizePixel = 0, Parent = row,
-			})
-			corner(track, 3)
-			local fill = create("Frame", {
-				BackgroundColor3 = Theme.Accent, Size = UDim2.new((value - min) / (max - min), 0, 1, 0),
-				BorderSizePixel = 0, Parent = track,
-			})
-			corner(fill, 3)
-			local knob = create("Frame", {
-				BackgroundColor3 = Theme.Text, AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.new((value - min) / (max - min), 0, 0.5, 0),
-				Size = UDim2.fromOffset(14, 14), BorderSizePixel = 0, ZIndex = 2, Parent = track,
-			})
-			corner(knob, 7)
-
-			local api = {}
-			local function apply(alpha, fire)
-				local raw = min + (max - min) * alpha
-				value = math.clamp(math.floor(raw / inc + 0.5) * inc, min, max)
-				local a = (max - min) == 0 and 0 or (value - min) / (max - min)
-				fill.Size = UDim2.new(a, 0, 1, 0)
-				knob.Position = UDim2.new(a, 0, 0.5, 0)
-				valLbl.Text = tostring(value)
-				if fire and slcfg.Callback then task.spawn(slcfg.Callback, value) end
-			end
-			bindDrag(track, function(ax) apply(ax, true) end)
-			function api:Set(v) apply((math.clamp(v, min, max) - min) / (max - min), true) end
-			function api:Get() return value end
-			api.Instance = row
-			return api
-		end
-
-		function Tab:CreateTextbox(txcfg)
-			txcfg = txcfg or {}
-			local row = newRow(36)
-			create("TextLabel", {
-				BackgroundTransparency = 1, Text = txcfg.Name or "Textbox",
-				FontFace = FONT_MAIN, TextColor3 = Theme.Text, TextSize = 14,
-				TextXAlignment = Enum.TextXAlignment.Left, AnchorPoint = Vector2.new(0, 0.5),
-				Position = UDim2.new(0, 10, 0.5, 0), Size = UDim2.new(0.4, -10, 1, 0), Parent = row,
-			})
-			local boxWrap = create("Frame", {
-				BackgroundColor3 = Theme.Secondary, AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.new(0, 0, 0, 24),
-				AutomaticSize = Enum.AutomaticSize.X, ClipsDescendants = true,
-				BorderSizePixel = 0, Parent = row,
+			local SubTab = {}
+			local subPage = create("ScrollingFrame", {
+				Name = subName .. "Page", BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 1, 0), CanvasSize = UDim2.new(),
+				AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollBarThickness = 3,
+				ScrollBarImageColor3 = Theme.Stroke, ScrollBarImageTransparency = 0.5,
+				Visible = false, Parent = pageWrap,
+				Position = UDim2.new(0, 0, 0, 32), Size = UDim2.new(1, 0, 1, -32),
 			}, {
-				create("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }),
+				create("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
+				create("UIPadding", { PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10), PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }),
 			})
-			corner(boxWrap, 5)
-			local tbStroke = stroke(boxWrap, Theme.Stroke, STROKE_T)
-			local tb = create("TextBox", {
-				BackgroundTransparency = 1, Text = txcfg.Default or "",
-				PlaceholderText = txcfg.Placeholder or "...", PlaceholderColor3 = Theme.SubText,
-				FontFace = FONT_MAIN, TextColor3 = Theme.Text, TextSize = 13,
-				ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Left,
-				AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.new(0, 0, 1, 0), Parent = boxWrap,
+
+			local subBtn = create("TextButton", {
+				Name = subName .. "Btn", Text = subName, FontFace = FONT_MAIN,
+				TextColor3 = Theme.SubText, TextSize = 13, AutoButtonColor = false,
+				BackgroundColor3 = Theme.Accent, BackgroundTransparency = 1,
+				Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X,
+				Parent = subNav,
 			}, {
-				create("UISizeConstraint", {
-					MinSize = Vector2.new(txcfg.MinWidth or 56, 0),
-					MaxSize = Vector2.new(txcfg.MaxWidth or 180, math.huge),
-				}),
+				create("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }),
 			})
-			tb.Focused:Connect(function() tween(tbStroke, TI, { Color = Theme.Accent, Transparency = 0.2 }) end)
-			tb.FocusLost:Connect(function()
-				tween(tbStroke, TI, { Color = Theme.Stroke, Transparency = STROKE_T })
-				if txcfg.Callback then task.spawn(txcfg.Callback, tb.Text) end
-			end)
-			return {
-				Set = function(_, t) tb.Text = t end,
-				Get = function() return tb.Text end,
-				Instance = row,
-			}
-		end
-
-		function Tab:CreateColorPicker(ccfg)
-			ccfg = ccfg or {}
-			local color = ccfg.Default or Color3.fromRGB(255, 0, 0)
-			local h, s, v = color:ToHSV()
-
-			local row = newRow(36)
-			row.ClipsDescendants = true
-			local header = create("TextButton", { Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 36), Parent = row })
-			create("TextLabel", {
-				BackgroundTransparency = 1, Text = ccfg.Name or "Color",
-				FontFace = FONT_MAIN, TextColor3 = Theme.Text, TextSize = 14,
-				TextXAlignment = Enum.TextXAlignment.Left, AnchorPoint = Vector2.new(0, 0.5),
-				Position = UDim2.new(0, 10, 0.5, 0), Size = UDim2.new(1, -60, 1, 0), Parent = header,
-			})
-			local swatch = create("Frame", {
-				BackgroundColor3 = color, AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -10, 0.5, 0), Size = UDim2.fromOffset(34, 18),
-				BorderSizePixel = 0, Parent = header,
-			})
-			corner(swatch, 4); stroke(swatch, Theme.Stroke, 0.4)
-
-			local body = create("Frame", {
-				BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 36),
-				Size = UDim2.new(1, 0, 0, 130), Visible = false, Parent = row,
-			})
-			create("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10), Parent = body })
-
-			local sv = create("Frame", {
-				BackgroundColor3 = Color3.fromHSV(h, 1, 1), Size = UDim2.new(1, -34, 1, 0),
-				BorderSizePixel = 0, Parent = body,
-			})
-			corner(sv, 4)
-			create("Frame", { BackgroundColor3 = Color3.new(1,1,1), Size = UDim2.new(1,0,1,0), BorderSizePixel = 0, Parent = sv }, {
-				create("UIGradient", { Color = ColorSequence.new(Color3.new(1,1,1)), Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,0), NumberSequenceKeypoint.new(1,1) }) }),
-				create("UICorner", { CornerRadius = UDim.new(0,4) }),
-			})
-			create("Frame", { BackgroundColor3 = Color3.new(0,0,0), Size = UDim2.new(1,0,1,0), BorderSizePixel = 0, Parent = sv }, {
-				create("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.new(0,0,0)), Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,1), NumberSequenceKeypoint.new(1,0) }) }),
-				create("UICorner", { CornerRadius = UDim.new(0,4) }),
-			})
-			local svCursor = create("Frame", {
-				BackgroundColor3 = Color3.new(1,1,1), AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.new(s, 0, 1 - v, 0), Size = UDim2.fromOffset(8, 8),
-				BorderSizePixel = 0, ZIndex = 5, Parent = sv,
-			})
-			corner(svCursor, 4); stroke(svCursor, Color3.new(0,0,0), 0.2)
-
-			local hue = create("Frame", {
-				AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0),
-				Size = UDim2.new(0, 22, 1, 0), BorderSizePixel = 0, Parent = body,
-			}, {
-				create("UIGradient", {
-					Rotation = 90,
-					Color = ColorSequence.new({
-						ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255,0,0)),
-						ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255,255,0)),
-						ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0,255,0)),
-						ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0,255,255)),
-						ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0,0,255)),
-						ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255,0,255)),
-						ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255,0,0)),
-					}),
-				}),
-				create("UICorner", { CornerRadius = UDim.new(0, 4) }),
-			})
-			local hueCursor = create("Frame", {
-				BackgroundColor3 = Color3.new(1,1,1), AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.new(0.5, 0, h, 0), Size = UDim2.new(1, 4, 0, 4),
-				BorderSizePixel = 0, ZIndex = 5, Parent = hue,
-			})
-			corner(hueCursor, 2); stroke(hueCursor, Color3.new(0,0,0), 0.2)
-
-			local function refresh(fire)
-				color = Color3.fromHSV(h, s, v)
-				sv.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-				svCursor.Position = UDim2.new(s, 0, 1 - v, 0)
-				hueCursor.Position = UDim2.new(0.5, 0, h, 0)
-				swatch.BackgroundColor3 = color
-				if fire and ccfg.Callback then task.spawn(ccfg.Callback, color) end
-			end
-			bindDrag(sv, function(ax, ay) s = ax; v = 1 - ay; refresh(true) end)
-			bindDrag(hue, function(_, ay) h = ay; refresh(true) end)
-
-			local open = false
-			header.Activated:Connect(function()
-				open = not open
-				if open then body.Visible = true end
-				tween(row, TI_S, { Size = UDim2.new(1, 0, 0, open and 172 or 36) })
-				if not open then task.delay(0.12, function() if not open then body.Visible = false end end) end
-			end)
-
-			local api = {}
-			function api:Set(c) h, s, v = c:ToHSV(); refresh(true) end
-			function api:Get() return color end
-			api.Instance = row
-			return api
-		end
-
-		function Tab:CreateDropdown(dcfg)
-			dcfg = dcfg or {}
-			local options = dcfg.Options or {}
-			local multi = dcfg.Multi or false
-			local selected = {}
-			if dcfg.Default then
-				if type(dcfg.Default) == "table" then
-					for _, d in dcfg.Default do selected[d] = true end
-				else selected[dcfg.Default] = true end
-			end
-
-			local row = newRow(36)
-			row.ClipsDescendants = true
-			local header = create("TextButton", { Text = "", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 36), Parent = row })
-			create("TextLabel", {
-				BackgroundTransparency = 1, Text = dcfg.Name or "Dropdown",
-				FontFace = FONT_MAIN, TextColor3 = Theme.Text, TextSize = 14,
-				TextXAlignment = Enum.TextXAlignment.Left, AnchorPoint = Vector2.new(0, 0.5),
-				Position = UDim2.new(0, 10, 0.5, 0), Size = UDim2.new(0.5, 0, 1, 0), Parent = header,
-			})
-			local valLbl = create("TextLabel", {
-				BackgroundTransparency = 1, Text = "",
-				FontFace = FONT_MAIN, TextColor3 = Theme.SubText, TextSize = 13,
-				TextXAlignment = Enum.TextXAlignment.Right, TextTruncate = Enum.TextTruncate.AtEnd,
-				AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -32, 0.5, 0),
-				Size = UDim2.new(0.5, -8, 1, 0), Parent = header,
-			})
-			local chev = icon("chevron-down", 16, false, Theme.SubText)
-			chev.AnchorPoint = Vector2.new(1, 0.5)
-			chev.Position = UDim2.new(1, -10, 0.5, 0)
-			chev.Parent = header
-
-			local list = create("Frame", {
-				BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 36),
-				Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
-				Visible = false, Parent = row,
-			}, {
-				create("UIListLayout", { Padding = UDim.new(0, 2), SortOrder = Enum.SortOrder.LayoutOrder }),
-				create("UIPadding", { PaddingLeft = UDim.new(0,8), PaddingRight = UDim.new(0,8), PaddingBottom = UDim.new(0,8) }),
+			local underline = create("Frame", {
+				BackgroundColor3 = Theme.Accent, BorderSizePixel = 0,
+				Position = UDim2.new(0, 0, 1, -2), Size = UDim2.new(1, 0, 0, 2),
+				Visible = false, Parent = subBtn,
 			})
 
-			local function updateValLabel()
-				local picked = {}
-				for _, o in options do if selected[o] then table.insert(picked, o) end end
-				valLbl.Text = #picked == 0 and "None" or table.concat(picked, ", ")
-			end
-
-			local api = {}
-			local optionBtns = {}
-
-			local function rebuild()
-				for _, b in optionBtns do b.btn:Destroy() end
-				table.clear(optionBtns)
-				for i, opt in options do
-					local ob = create("TextButton", {
-						Text = "", AutoButtonColor = false, BackgroundColor3 = Theme.Secondary,
-						Size = UDim2.new(1, 0, 0, 28), LayoutOrder = i, BorderSizePixel = 0, Parent = list,
-					})
-					corner(ob, 5)
-					local txt = create("TextLabel", {
-						BackgroundTransparency = 1, Text = opt, FontFace = FONT_MAIN,
-						TextColor3 = selected[opt] and Theme.Accent or Theme.SubText, TextSize = 13,
-						TextXAlignment = Enum.TextXAlignment.Left, Position = UDim2.new(0, 8, 0, 0),
-						Size = UDim2.new(1, -30, 1, 0), Parent = ob,
-					})
-					local check = icon("check", 14, false, Theme.Accent)
-					check.AnchorPoint = Vector2.new(1, 0.5)
-					check.Position = UDim2.new(1, -8, 0.5, 0)
-					check.Visible = selected[opt] == true
-					check.Parent = ob
-
-					ob.MouseEnter:Connect(function() tween(ob, TI, { BackgroundColor3 = Theme.ElementHover }) end)
-					ob.MouseLeave:Connect(function() tween(ob, TI, { BackgroundColor3 = Theme.Secondary }) end)
-					ob.Activated:Connect(function()
-						if multi then
-							selected[opt] = not selected[opt]
-						else
-							table.clear(selected); selected[opt] = true
-						end
-						for _, b in optionBtns do
-							local on = selected[b.opt] == true
-							b.check.Visible = on
-							tween(b.txt, TI, { TextColor3 = on and Theme.Accent or Theme.SubText })
-						end
-						updateValLabel()
-						if dcfg.Callback then
-							if multi then
-								local out = {}
-								for _, o in options do if selected[o] then table.insert(out, o) end end
-								task.spawn(dcfg.Callback, out)
-							else
-								task.spawn(dcfg.Callback, opt)
-							end
-						end
-						if not multi then
-							task.wait(0.05)
-							api._toggle(false)
-						end
-					end)
-					table.insert(optionBtns, { btn = ob, opt = opt, txt = txt, check = check })
+			local function subSelect()
+				if Tab._currentSub == SubTab then return end
+				if Tab._currentSub then
+					local cur = Tab._currentSub
+					cur._page.Visible = false
+					cur._line.Visible = false
+					tween(cur._btn, TI, { TextColor3 = Theme.SubText })
 				end
-				updateValLabel()
+				-- Hide main scroll if sub-tabs exist
+				mainScroll.Visible = false
+				Tab._currentSub = SubTab
+				subPage.Visible = true
+				underline.Visible = true
+				tween(subBtn, TI, { TextColor3 = Theme.Text })
 			end
 
-			local function openHeight()
-				local n = #options
-				if n == 0 then return 44 end
-				return 36 + (n * 28) + ((n - 1) * 2) + 8
-			end
+			subBtn.Activated:Connect(subSelect)
+			SubTab._btn, SubTab._page, SubTab._line = subBtn, subPage, underline
+			table.insert(Tab.SubTabs, SubTab)
+			if #Tab.SubTabs == 1 then subSelect() end
 
-			local open = false
-			function api._toggle(force)
-				if force ~= nil then open = force else open = not open end
-				if open then list.Visible = true end
-				tween(row, TI_S, { Size = UDim2.new(1, 0, 0, open and openHeight() or 36) })
-				tween(chev, TI, { Rotation = open and 180 or 0 })
-				if not open then task.delay(0.12, function() if not open then list.Visible = false end end) end
-			end
-			header.Activated:Connect(function() api._toggle() end)
-
-			function api:Refresh(newOpts)
-				options = newOpts or options
-				rebuild()
-				if open then api._toggle(true) end
-			end
-			function api:Set(val)
-				table.clear(selected)
-				if type(val) == "table" then for _, x in val do selected[x] = true end
-				else selected[val] = true end
-				rebuild()
-			end
-			function api:Get()
-				local out = {}
-				for _, o in options do if selected[o] then table.insert(out, o) end end
-				return multi and out or out[1]
-			end
-			api.Instance = row
-			rebuild()
-			return api
+			attachElements(SubTab, subPage)
+			return SubTab
 		end
 
 		return Tab
