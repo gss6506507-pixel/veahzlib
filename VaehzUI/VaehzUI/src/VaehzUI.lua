@@ -1,5 +1,5 @@
 --[[
-	Vaehz UI Library
+	GROSS HUB UI Library
 	Pro of AI
 ]]
 
@@ -66,7 +66,6 @@ local function stroke(parent, color, trans, thick)
 	})
 end
 
--- UIShadow is a beta instance; guard so the lib never hard-errors if it's absent
 local function addShadow(parent, blur, trans)
 	local ok, shadow = pcall(function()
 		return create("UIShadow", {
@@ -95,7 +94,7 @@ local function icon(name, size, filled, color)
 	})
 end
 
--- Draggable window via a handle
+-- Draggable window or button via handle (supports Mouse + Touch for Mobile)
 local function makeDraggable(frame, handle)
 	local dragging, dragInput, startPos, startFramePos
 	handle.InputBegan:Connect(function(inp)
@@ -123,7 +122,6 @@ local function makeDraggable(frame, handle)
 	end)
 end
 
--- Normalized drag region (sliders / color squares). Supports mouse + touch.
 local function bindDrag(region, onUpdate)
 	local dragging = false
 	local function upd(inp)
@@ -157,13 +155,11 @@ local function getGuiParent()
 	return ok and cg or game:GetService("CoreGui")
 end
 
--- Copy a string to clipboard. Returns whether a clipboard fn was available.
 local function copyToClipboard(str)
 	if not setClipboard then return false end
 	return pcall(setClipboard, str)
 end
 
--- Ask the local Discord app (RPC on :6463) to open an invite. Returns success.
 local function openDiscordInvite(code)
 	if not httpRequest then return false end
 	return pcall(function()
@@ -187,7 +183,7 @@ local Library = {}
 Library.__index = Library
 
 local ScreenGui = create("ScreenGui", {
-	Name = "VaehzUI",
+	Name = "GrossHubUI",
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	ResetOnSpawn = false,
 	IgnoreGuiInset = true,
@@ -260,7 +256,6 @@ function Library:Notify(cfg)
 		})
 	end
 
-	-- slide + fade in
 	card.Position = UDim2.new(0, 26, 0, 0)
 	tween(card, TI_S, { BackgroundTransparency = 0, Position = UDim2.new(0, 0, 0, 0) })
 	tween(st, TI_S, { Transparency = STROKE_T })
@@ -280,7 +275,7 @@ function Library:Notify(cfg)
 end
 
 ----------------------------------------------------------------------
--- Window
+-- Window & Floating Toggle Button
 ----------------------------------------------------------------------
 function Library:CreateWindow(cfg)
 	cfg = cfg or {}
@@ -288,6 +283,7 @@ function Library:CreateWindow(cfg)
 
 	local Window = { Tabs = {}, _current = nil }
 
+	-- Main Window Frame
 	local BG = create("CanvasGroup", {
 		Name = "Window",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -301,6 +297,38 @@ function Library:CreateWindow(cfg)
 	corner(BG, 6)
 	stroke(BG, Theme.Stroke, 0.5)
 	addShadow(BG, 20, 0.5)
+
+	-- Floating Toggle Button (Rounded Square to open/close hub)
+	local ToggleBtn = create("TextButton", {
+		Name = "GrossHubToggle",
+		BackgroundColor3 = Theme.Secondary,
+		Position = UDim2.new(0, 30, 0, 200),
+		Size = UDim2.fromOffset(46, 46),
+		AutoButtonColor = false,
+		Text = "",
+		ZIndex = 99,
+		Parent = ScreenGui,
+	})
+	corner(ToggleBtn, 10)
+	stroke(ToggleBtn, Theme.Accent, 0.3, 1.5)
+	addShadow(ToggleBtn, 12, 0.4)
+
+	local toggleIcon = icon("layout", 22, false, Theme.Accent)
+	toggleIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+	toggleIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
+	toggleIcon.Parent = ToggleBtn
+
+	makeDraggable(ToggleBtn, ToggleBtn)
+
+	local isOpen = true
+	local function toggleHub()
+		isOpen = not isOpen
+		BG.Visible = isOpen
+		tween(ToggleBtn, TI, { BackgroundColor3 = isOpen and Theme.Accent or Theme.Secondary })
+		tween(toggleIcon, TI, { TextColor3 = isOpen and Theme.Text or Theme.Accent })
+	end
+
+	ToggleBtn.Activated:Connect(toggleHub)
 
 	-- Top bar
 	local TopBar = create("Frame", {
@@ -316,7 +344,7 @@ function Library:CreateWindow(cfg)
 	addShadow(TopBar, 10, 0.86)
 
 	create("TextLabel", {
-		Name = "Title", Text = cfg.Title or "Lib Name",
+		Name = "Title", Text = cfg.Title or "GROSS HUB",
 		FontFace = FONT_TITLE, TextColor3 = Theme.Text, TextSize = 16,
 		TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true,
 		BackgroundTransparency = 1, AnchorPoint = Vector2.new(0, 0.5),
@@ -349,21 +377,10 @@ function Library:CreateWindow(cfg)
 
 	local CloseBtn = ctrlBtn("x", -10, Color3.fromRGB(255, 90, 90))
 	local MinBtn   = ctrlBtn("minus", -42, Theme.Text)
-	local YtBtn    = ctrlBtn("youtube", -74, Color3.fromRGB(255, 60, 60))
-	local DcBtn    = ctrlBtn("discord", -106, Color3.fromRGB(88, 101, 242))
+	local DcBtn    = ctrlBtn("discord", -74, Color3.fromRGB(88, 101, 242))
 
-	local YT_LINK = cfg.YouTube or "https://youtube.com/@vaehz"
-	local DC_LINK = cfg.DiscordInvite or "https://discord.gg/vaehz"
-	local DC_CODE = cfg.DiscordCode or "vaehz"
-
-	YtBtn.Activated:Connect(function()
-		local copied = copyToClipboard(YT_LINK)
-		Library:Notify({
-			Title = "YouTube",
-			Content = copied and "Channel link copied to clipboard" or "Clipboard unavailable: " .. YT_LINK,
-			Duration = 3,
-		})
-	end)
+	local DC_LINK = cfg.DiscordInvite or "https://discord.gg/grosshub"
+	local DC_CODE = cfg.DiscordCode or "grosshub"
 
 	DcBtn.Activated:Connect(function()
 		local copied = copyToClipboard(DC_LINK)
@@ -402,7 +419,6 @@ function Library:CreateWindow(cfg)
 		Parent = Body,
 	})
 
-	-- Divider between sidebar and content
 	create("Frame", {
 		Name = "SideDivider", BackgroundColor3 = Theme.Stroke, BackgroundTransparency = STROKE_T,
 		BorderSizePixel = 0, Position = UDim2.new(0, 140, 0, 0), Size = UDim2.new(0, 1, 1, 0),
@@ -411,7 +427,6 @@ function Library:CreateWindow(cfg)
 
 	makeDraggable(BG, TopBar)
 
-	-- Close / minimize
 	CloseBtn.Activated:Connect(function()
 		tween(BG, TI, { GroupTransparency = 1, Size = UDim2.fromOffset(BG.AbsoluteSize.X, 0) })
 		task.wait(0.18)
@@ -421,7 +436,6 @@ function Library:CreateWindow(cfg)
 	local minimized = false
 	MinBtn.Activated:Connect(function()
 		minimized = not minimized
-		tween(Body, TI, { Size = UDim2.new(1, 0, 1, minimized and -45 or -45) }) -- or hide body contents
 		Body.Visible = not minimized
 		tween(BG, TI, { Size = UDim2.fromOffset(532, minimized and 45 or 410) })
 	end)
