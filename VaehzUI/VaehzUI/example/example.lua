@@ -3,8 +3,7 @@
 	Demonstrates all components available in Vaehz UI.
 ]]
 
--- Load the library (if hosting on GitHub RAW, replace with your raw link)
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/seu-usuario/VaehzUI/main/src/VaehzUI.lua"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/gss6506507-pixel/veahzlib/refs/heads/main/VaehzUI/VaehzUI/src/VaehzUI.lua"))()
 
 -- Create Window
 local Window = Library:CreateWindow({
